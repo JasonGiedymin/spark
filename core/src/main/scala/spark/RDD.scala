@@ -653,15 +653,12 @@ abstract class RDD[T: ClassManifest](
 
   /**
    * Return the number of elements in the RDD.
+   * With Iterator used below, we are already in Scala 'space'
+   * and foldLeft seems to be faster in benchmarks.
    */
   def count(): Long = {
     sc.runJob(this, (iter: Iterator[T]) => {
-      var result = 0L
-      while (iter.hasNext) {
-        result += 1L
-        iter.next()
-      }
-      result
+      iter.foldLeft(0L){ (acc:Long,b:T) => acc + 1L }
     }).sum
   }
 
@@ -838,7 +835,9 @@ abstract class RDD[T: ClassManifest](
   def checkpoint() {
     if (context.checkpointDir.isEmpty) {
       throw new Exception("Checkpoint directory has not been set in the SparkContext")
-    } else if (checkpointData.isEmpty) {
+    }
+
+    if (checkpointData.isEmpty) {
       checkpointData = Some(new RDDCheckpointData(this))
       checkpointData.get.markForCheckpoint()
     }

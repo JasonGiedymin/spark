@@ -129,12 +129,12 @@ class CheckpointSuite extends FunSuite with LocalSparkContext with Logging {
     // Test whether size of CoalescedRDD reduce in size after parent RDD is checkpointed
     // Current implementation of CoalescedRDDPartition has transient reference to parent RDD,
     // so only the RDD will reduce in serialized size, not the partitions.
-    testParentCheckpointing(_.coalesce(2), true, false)
+    testParentCheckpointing(_.coalesce(2), testRDDSize=true, testRDDPartitionSize=false)
 
     // Test that the CoalescedRDDPartition updates parent partitions (CoalescedRDDPartition.parents) after
     // the parent RDD has been checkpointed and parent partitions have been changed to HadoopPartitions.
     // Note that this test is very specific to the current implementation of CoalescedRDDPartitions
-    val ones = sc.makeRDD(1 to 100, 10).map(x => x)
+    val ones = sc.makeRDD(1 to 100, numSlices=10).map(x => x)
     ones.checkpoint() // checkpoint that MappedRDD
     val coalesced = new CoalescedRDD(ones, 2)
     val splitBeforeCheckpoint =
@@ -142,6 +142,38 @@ class CheckpointSuite extends FunSuite with LocalSparkContext with Logging {
     coalesced.count() // do the checkpointing
     val splitAfterCheckpoint =
       serializeDeserialize(coalesced.partitions.head.asInstanceOf[CoalescedRDDPartition])
+    assert(
+      splitAfterCheckpoint.parents.head != splitBeforeCheckpoint.parents.head,
+      "CoalescedRDDPartition.parents not updated after parent RDD checkpointed"
+    )
+  }
+
+  test("LocalityCoalescedRDD") {
+    val maxCount:Int = 100
+
+    testCheckpointing(_.coalesce(2))
+
+    // Test whether size of CoalescedRDD reduce in size after parent RDD is checkpointed
+    // Current implementation of CoalescedRDDPartition has transient reference to parent RDD,
+    // so only the RDD will reduce in serialized size, not the partitions.
+    testParentCheckpointing(_.coalesce(2), testRDDSize=true, testRDDPartitionSize=false)
+
+    // Test that the CoalescedRDDPartition updates parent partitions (CoalescedRDDPartition.parents) after
+    // the parent RDD has been checkpointed and parent partitions have been changed to HadoopPartitions.
+    // Note that this test is very specific to the current implementation of CoalescedRDDPartitions
+    val rdds = sc.makeRDD(1 to maxCount, numSlices=10).map(x => x)
+
+    rdds.checkpoint() // checkpoint that MappedRDD
+
+    val coalesced = new CoalescedRDD(rdds, 2)
+
+    val splitBeforeCheckpoint = serializeDeserialize(coalesced.partitions.head.asInstanceOf[CoalescedRDDPartition])
+    coalesced.count() // do the checkpointing
+    val splitAfterCheckpoint = serializeDeserialize(coalesced.partitions.head.asInstanceOf[CoalescedRDDPartition])
+
+    println("=> %s " format splitAfterCheckpoint.parents.head)
+    println("  -> %s " format splitBeforeCheckpoint.parents.head)
+
     assert(
       splitAfterCheckpoint.parents.head != splitBeforeCheckpoint.parents.head,
       "CoalescedRDDPartition.parents not updated after parent RDD checkpointed"

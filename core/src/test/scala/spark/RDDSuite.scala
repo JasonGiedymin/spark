@@ -136,8 +136,7 @@ class RDDSuite extends FunSuite with SharedSparkContext {
 
     val coalesced2 = data.coalesce(3)
     assert(coalesced2.collect().toList === (1 to 10).toList)
-    assert(coalesced2.glom().collect().map(_.toList).toList ===
-      List(List(1, 2, 3), List(4, 5, 6), List(7, 8, 9, 10)))
+    assert(coalesced2.glom().collect().map(_.toList).toList === List(List(1, 2, 3), List(4, 5, 6), List(7, 8, 9, 10)))
 
     val coalesced3 = data.coalesce(10)
     assert(coalesced3.collect().toList === (1 to 10).toList)
