@@ -6,7 +6,23 @@ import spark.rdd._
 import spark.SparkContext._
 import storage.StorageLevel
 
-class CheckpointSuite extends FunSuite with LocalSparkContext with Logging {
+trait CheckpointSerialization {
+  /**
+   * Serialize and deserialize an object. This is useful to verify the objects
+   * contents after deserialization (e.g., the contents of an RDD split after
+   * it is sent to a slave along with a task)
+   */
+  def serializeDeserialize[T](obj: T): T = {
+    val bytes = Utils.serialize(obj)
+    Utils.deserialize[T](bytes)
+  }
+}
+
+class CheckpointSuite extends FunSuite
+  with LocalSparkContext
+  with Logging
+  with CheckpointSerialization
+{
   initLogging()
 
   var checkpointDir: File = _
@@ -379,16 +395,6 @@ class CheckpointSuite extends FunSuite with LocalSparkContext with Logging {
   def getSerializedSizes(rdd: RDD[_]): (Int, Int) = {
     (Utils.serialize(rdd).length - Utils.serialize(rdd.checkpointData).length,
      Utils.serialize(rdd.partitions).length)
-  }
-
-  /**
-   * Serialize and deserialize an object. This is useful to verify the objects
-   * contents after deserialization (e.g., the contents of an RDD split after
-   * it is sent to a slave along with a task)
-   */
-  def serializeDeserialize[T](obj: T): T = {
-    val bytes = Utils.serialize(obj)
-    Utils.deserialize[T](bytes)
   }
 }
 

@@ -83,7 +83,7 @@ class RDDSuite extends FunSuite with SharedSparkContext {
     val onlySplit = new Partition { override def index: Int = 0 }
     var shouldFail = true
     val rdd = new RDD[Int](sc, Nil) {
-      override def getPartitions: Array[Partition] = Array(onlySplit)
+      override def getPartitions: Array[Partition] = Array[Partition](onlySplit)
       override val getDependencies = List[Dependency[_]]()
       override def compute(split: Partition, context: TaskContext): Iterator[Int] = {
         if (shouldFail) {

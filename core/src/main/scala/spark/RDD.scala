@@ -41,6 +41,10 @@ import spark.util.BoundedPriorityQueue
 
 import SparkContext._
 
+trait Locality {
+  protected def getPreferredLocations(split: Partition): Seq[String] = Nil
+}
+
 /**
  * A Resilient Distributed Dataset (RDD), the basic abstraction in Spark. Represents an immutable,
  * partitioned collection of elements that can be operated on in parallel. This class contains the
@@ -70,7 +74,10 @@ import SparkContext._
 abstract class RDD[T: ClassManifest](
     @transient private var sc: SparkContext,
     @transient private var deps: Seq[Dependency[_]]
-  ) extends Serializable with Logging {
+) extends Serializable
+  with Logging
+  with Locality
+{
 
   /** Construct an RDD with just a one-to-one dependency on one parent */
   def this(@transient oneParent: RDD[_]) =
@@ -96,7 +103,7 @@ abstract class RDD[T: ClassManifest](
   protected def getDependencies: Seq[Dependency[_]] = deps
 
   /** Optionally overridden by subclasses to specify placement preferences. */
-  protected def getPreferredLocations(split: Partition): Seq[String] = Nil
+  override protected def getPreferredLocations(split: Partition): Seq[String] = Nil
 
   /** Optionally overridden by subclasses to specify how they are partitioned. */
   val partitioner: Option[Partitioner] = None
@@ -195,9 +202,7 @@ abstract class RDD[T: ClassManifest](
    */
   final def partitions: Array[Partition] = {
     checkpointRDD.map(_.partitions).getOrElse {
-      if (partitions_ == null) {
-        partitions_ = getPartitions
-      }
+      if ( Option(partitions_).isEmpty) partitions_ = getPartitions
       partitions_
     }
   }
@@ -269,7 +274,8 @@ abstract class RDD[T: ClassManifest](
   def coalesce(numPartitions: Int, shuffle: Boolean = false): RDD[T] = {
     if (shuffle) {
       // include a shuffle step so that our upstream tasks are still distributed
-      new CoalescedRDD(new ShuffledRDD(map(x => (x, null)), new HashPartitioner(numPartitions)), numPartitions).keys
+      val shuffledRDD = new ShuffledRDD(map(x => (x, null)), new HashPartitioner(numPartitions))
+      new CoalescedRDD(shuffledRDD, numPartitions).keys
     } else {
       new CoalescedRDD(this, numPartitions)
     }
